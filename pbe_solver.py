@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import argparse as ap
-import sys
+import os
 import scipy.constants as sc
 import numpy as np
 import matplotlib.pyplot as plt
@@ -40,7 +40,7 @@ parser.add_argument('-pmf_+', dest='pmf_cat', type=str, default=None,
                     help='supply file for cation PMF [in kT]')
 parser.add_argument('-pmf_-', dest='pmf_an', type=str, default=None,
                     help='supply file for anion PMF [in kT]')
-parser.add_argument('-out', dest='path_out', type=str, default='Desktop',
+parser.add_argument('-out', dest='path_out', type=str, default='current directory',
                     help='set directory to store computed data in')
 parser.add_argument('-v', dest='verbose', action='store_true',
                     help='verbose mode, norm of residual will be printed to screen')
@@ -49,13 +49,8 @@ parser.add_argument('-v', dest='verbose', action='store_true',
 args = parser.parse_args()
 verb = args.verbose  # setting verbose mode if wanted
 
-# detecting home directory on system
-if sys.platform == "darwin":  # folder for mac
-    home = '/Users/woldeaman/'
-elif sys.platform.startswith("linux"):  # folder for linux
-    home = '/home/amanuelwk/'
-if args.path_out is 'Desktop':  # determine save path
-    path_out = home+'/Desktop'
+if args.path_out is 'current directory':  # determine save path
+    path_out = os.getcwd()
 else:
     path_out = args.path_out
 ##########################################################################
