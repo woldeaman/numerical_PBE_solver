@@ -57,7 +57,7 @@ def parse_command_line():
 
     # setting up environment
     N = int(args.bins)  # number of discretization bins
-    zz = np.linspace(0, args.distance/2, N)  # bin vector [in nm], for half space
+    zz = np.linspace(0, args.distance/2, N)  # computing z-vector
 
     # gather supplied profiles for epsilon, rho & pmfs
     profiles = []  # storing profiles
@@ -67,36 +67,43 @@ def parse_command_line():
         if path is not None:
             try:  # see if argument is a constant value
                 const = float(path)
-                dat = np.ones(zz.size)*const  # if so, set constant profiles
+                dat = np.ones(N)*const  # if so, set constant profiles
             except ValueError:
                 dat = np.loadtxt(path, comments=['#', '@'])  # else read profiles
-                assert dat.size == zz.size, ('ERROR: Supplied profile does not have '
-                                             'the same length as discretization vector!\n%s'
-                                             % path)
+                assert dat.size == N, ('ERROR: Supplied profile does not have '
+                                       'the same length as discretization vector!\n%s'
+                                       % path)
         else:  # if nothing supplied set profiles to defaults
-            dat = np.ones(zz.size)*default
+            dat = np.ones(N)*default
         profiles.append(dat)
     # save loaded profiles
     eps, rho, pmf_cat, pmf_an = profiles[0], profiles[1], profiles[2], profiles[3]
 
+    return (path_out, verb, N, zz, eps, rho, pmf_cat, pmf_an, args.sigma,
+            args.temp, args.distance, args.valency, args.c_0)
+
+
+def convert_units(bins, temp, dist, valency, sig, rho, c_0):
+    """
+    Convert physical variables to dimensionless variables to solve PBE with.
+    """
+
     # now make unit conversion
-    beta = 1/(sc.Boltzmann*args.temp)  # thermodynamic beta
+    beta = 1/(sc.Boltzmann*temp)  # thermodynamic beta
     nm_to_m = 1E-9
-    c_0 = sc.Avogadro*args.c_0*1E3  # bulk concentration in particles per m^3
-    sigma = args.sigma*sc.elementary_charge/(nm_to_m**2)  # surface charge in SI
+    c_0 = sc.Avogadro*c_0*1E3  # bulk concentration in particles per m^3
+    sigma = sig*sc.elementary_charge/(nm_to_m**2)  # surface charge in SI
     rho = rho*sc.elementary_charge/(nm_to_m**3)  # external charge density in SI
 
     # compute rescaled variables
-    valency = args.valency
     kappa = (sc.elementary_charge * valency *  # modified debye length
              np.sqrt(beta*c_0/sc.epsilon_0))  # actual l_b would be sqrt(2/eps)*kappa
-    zz_hat = np.linspace(0, args.distance/2, N)*nm_to_m*kappa  # rescaled z-distance
+    zz_hat = np.linspace(0, dist/2, bins)*nm_to_m*kappa  # rescaled z-distance
     dz_hat = abs(zz_hat[0]-zz_hat[1])  # rescaled discretization width
     sigma_hat = sigma*np.sqrt(beta)/np.sqrt(sc.epsilon_0*c_0)  # rescaled surface charge
     rho_hat = rho/(sc.elementary_charge*valency*c_0)  # rescaled surface charge
 
-    return (path_out, verb, zz, valency, kappa, c_0, beta, dz_hat, sigma_hat,
-            rho_hat, eps, pmf_cat, pmf_an)
+    return (zz_hat, kappa, c_0, beta, dz_hat, sigma_hat, rho_hat)
 
 
 @jit(nopython=True)  # iterative loop ported to c by numba
@@ -220,14 +227,17 @@ def saveData(zz, psi, pmf_an, pmf_cat, c_0, kappa, beta, valency, path_out):
 ##########################################################################
 def main():
     # read from command line
-    (path_out, verb, zz, valency, kappa, c_0, beta, dz_hat, sigma_hat,
-     rho_hat, eps, pmf_cat, pmf_an) = parse_command_line()
+    (path_out, verb, bins, zz, eps, rho, pmf_cat, pmf_an, sigma,
+     temp, distance, valency, c_0_pre) = parse_command_line()
+    # convert units
+    (zz_hat, kappa, c_0, beta, dz_hat, sigma_hat, rho_hat) = convert_units(
+        bins, temp, distance, valency, sigma, rho, c_0_pre)
 
     # compute gouy chapman solution to start with
     eps_avg = np.average(eps)  # average epsilon
-    psi_start = 1+(sigma_hat/eps_avg)*np.exp(-(zz*kappa))  # gouy chapman solution
+    psi_start = (sigma_hat/eps_avg)*np.exp(-(zz_hat))  # gouy chapman solution
     # TODO: implement correct formula, probably also depends on eps, pmfs, rho ...
-    omega = 2/(1 + np.sqrt(np.pi/zz.size))  # omega parameter for SOR
+    omega = 2/(1 + np.sqrt(np.pi/bins))  # omega parameter for SOR
 
     # call iteration procedure
     psi = iteration_loop(psi_start, omega, dz_hat, sigma_hat, rho_hat, eps,
