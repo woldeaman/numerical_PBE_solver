@@ -25,7 +25,6 @@
 *.log
 *.sql
 *.sqlite
-*.txt
 *.csv
 
 # OS generated files #
@@ -42,9 +41,16 @@ Thumbs.db
 ###################
 __pycache__
 
+# install files #
+#################
+/build
+/dist
+*.egg*
+
 # results from analysis #
 #########################
 *.pdf
-*.txt
+dens_*.txt
+psi.txt
 *.npy
 *.xlsx
