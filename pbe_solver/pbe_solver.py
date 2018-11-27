@@ -32,9 +32,9 @@ def parse_command_line():
                         help='bulk concentration of the ionic solution [in mol/l]')
     parser.add_argument('-T', dest='temp', type=float, default=300,
                         help='system temperatur [in K]')
-    parser.add_argument('-eps', dest='epsilon', type=str, default=80,
-                        help='supply file containing dielectric profile, '
-                        'if a number is supplied, this will set epsilon in entire domain')
+    parser.add_argument('-eps', dest='epsilon', type=str, default=1/80,
+                        help='supply file containing inverse dielectric profile, '
+                        'if a number is supplied, this will set the value in the entire domain')
     parser.add_argument('-rho', dest='rho', type=str, default=None,
                         help='supply file containing charge density [in e/m^3]')
     parser.add_argument('-pmf_+', dest='pmf_cat', type=str, default=None,
