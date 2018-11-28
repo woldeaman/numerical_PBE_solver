@@ -14,7 +14,5 @@ You'll need [Python3](https://www.python.org) with the numba package installed.
 
 ## Linux/MacOS
 
-```
-python3 setup.py install
-```
+``python3 setup.py install``
 
