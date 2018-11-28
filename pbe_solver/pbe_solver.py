@@ -232,7 +232,7 @@ def main():
         bins, temp, distance, valency, sigma, rho, c_0_pre)
 
     # compute gouy chapman solution to start with
-    eps_avg = np.average(eps)  # average epsilon
+    eps_avg = 1/np.average(eps)  # average epsilon
     psi_start = (sigma_hat/eps_avg)*np.exp(-(zz_hat))  # gouy chapman solution
     # TODO: implement correct formula, probably also depends on eps, pmfs, rho ...
     omega = 2/(1 + np.sqrt(np.pi/bins))  # omega parameter for SOR
