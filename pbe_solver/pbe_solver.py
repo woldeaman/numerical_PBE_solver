@@ -32,6 +32,7 @@ def parse_command_line():
                         help='bulk concentration of the ionic solution [in mol/l]')
     parser.add_argument('-T', dest='temp', type=float, default=300,
                         help='system temperatur [in K]')
+    # NOTE: epsilon cannot be actually zero because of division by zero...
     parser.add_argument('-eps', dest='epsilon', type=str, default=1/80,
                         help='supply file containing inverse dielectric profile, '
                         'if a number is supplied, this will set the value in the entire domain')
@@ -106,15 +107,14 @@ def convert_units(bins, temp, dist, valency, sig, rho, c_0):
     return (zz_hat, kappa, c_0, beta, dz_hat, sigma_hat, rho_hat)
 
 
-@jit(nopython=True)  # iterative loop ported to c by numba
+@jit(nopython=True)  # iterative loop compiled by numba
 def iteration_loop(psi_start, omega, dz_hat, sigma_hat, rho_hat, eps,
-                   pmf_cat, pmf_an, tol=1E-10, verb=False):
+                   pmf_cat, pmf_an, tol=1E-10):
     # setting start values
     psi = psi_start
     N = psi.size  # gather number of discretization bins
-    # copy values for previous solution intially
     psi_prev = np.zeros(N)
-    for i in range(N):
+    for i in range(N):  # copy values for previous solution intially
         psi_prev[i] = psi_start[i]
     rel_err = tol + 1  # initially error is larger than tolerance
 
@@ -123,24 +123,24 @@ def iteration_loop(psi_start, omega, dz_hat, sigma_hat, rho_hat, eps,
         rho_0 = (np.exp(-psi[0]-pmf_cat[0]) - np.exp(psi[0]-pmf_an[0]) +
                  rho_hat[0])
         psi_0 = (psi[1] +  # constant field due to surface charge bc
-                 4*dz_hat*sigma_hat/(eps[1]+3*eps[0]) +
-                 2*(dz_hat**2)*rho_0/(eps[1]+3*eps[0]))
-        psi[0] = (1 - omega)*psi_prev[0] + omega*psi_0  # possible over relaxation
+                 2*dz_hat*sigma_hat * (eps[1] + 3*eps[0])/8 +
+                 rho_0 * (dz_hat**2)*eps[0]/2)
+        psi[0] = (1 - omega)*psi_prev[0] + omega*psi_0  # over relaxation
 
-        # now compute internal values inside the domain
+        # now compute internal values inside domain
         for i in range(1, N-1):
             rho_i = (np.exp(-psi[i]-pmf_cat[i]) - np.exp(psi[i]-pmf_an[i]) +
                      rho_hat[i])  # ion charge distribution + extra charges
-            psi_i = (psi[i+1]*(eps[i+1] + eps[i]) +
-                     psi[i-1]*(eps[i-1] + eps[i]) +
-                     2*(dz_hat**2)*rho_i) / (eps[i+1] + 2*eps[i] + eps[i-1])
+            psi_i = (psi[i+1]*(-eps[i+1] + 4*eps[i] + eps[i-1])/(8*eps[i]) +
+                     psi[i-1]*(eps[i+1] + 4*eps[i] - eps[i-1])/(8*eps[i]) +
+                     rho_i * (dz_hat**2)*eps[i]/2)
             psi[i] = (1 - omega)*psi_prev[i] + omega*psi_i
 
         # now compute value at right boundary
         rho_N = (np.exp(-psi[-1]-pmf_cat[-1]) - np.exp(psi[-1]-pmf_an[-1]) +
                  rho_hat[-1])
         psi_N = (psi[-2] +  # no field in bulk bc
-                 2*(dz_hat**2)*rho_N/(eps[-2]+3*eps[-1]))
+                 rho_N * (dz_hat**2)*eps[-1]/2)
         psi[-1] = (1 - omega)*psi_prev[-1] + omega*psi_N
 
         # TODO: maybe implement chebishev acceleration for omega ...
@@ -148,10 +148,8 @@ def iteration_loop(psi_start, omega, dz_hat, sigma_hat, rho_hat, eps,
         # wrapping up loop iteration
         rel_err = 0  # compute averaged deviation from previous iteration
         for i in range(N):
-            rel_err += abs(psi[i] - psi_prev[i])
-        rel_err = rel_err/np.sqrt(N)
-        if verb:  # if wanted residual norm will be printed
-            print(rel_err)
+            rel_err += (psi[i] - psi_prev[i])**2
+        rel_err = np.sqrt(rel_err/(N-1))
 
         for i in range(N):  # store previous solution for next itreation
             psi_prev[i] = psi[i]
