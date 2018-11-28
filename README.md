@@ -10,7 +10,7 @@ A powerful solver for the generalized Poisson–Boltzmann equation in the form:
 
 ## Prerequisites
 
-You'll need [Python3](https://www.python.org) with the numba package installed.
+You'll need [Python3](https://www.python.org) with the [numba package](http://numba.pydata.org/) installed.
 
 ## Linux/MacOS
 
