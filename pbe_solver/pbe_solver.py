@@ -165,13 +165,6 @@ def showData(zz, psi, pmf_an, pmf_cat, c_0, beta, valency, sigma_hat, plot=False
     # compute ion densities from potential and pmfs
     rho_ion_n = 1E-27*c_0*np.exp(psi-pmf_an)  # anion density in nm^-3
     rho_ion_p = 1E-27*c_0*np.exp(-psi-pmf_cat)  # cation density in nm^-3
-    # see if this balances out surface charge
-    sig = np.trapz(valency*(rho_ion_p - rho_ion_n), zz)  # excess surface charge
-
-    sigma_units = np.sqrt(sc.epsilon_0*c_0)/(sc.elementary_charge*1E18*np.sqrt(beta))
-    print("Surface charge: %.5f e/nm^2"
-          % (sigma_hat*sigma_units))
-    print("Excess System charge: %.5f e/nm^2" % sig)
 
     # convert psi to physical units [mV]
     psi_to_phi = 1E3/(sc.elementary_charge*valency*beta)
@@ -183,6 +176,11 @@ def showData(zz, psi, pmf_an, pmf_cat, c_0, beta, valency, sigma_hat, plot=False
     # make and show plot
     if plot:
         make_plot(symm_zz, symm_psi, symm_dens_n, symm_dens_p)
+        # see if ion charge density balances out surface charge
+        sig = np.trapz(valency*(rho_ion_p - rho_ion_n), zz)  # excess surface charge
+        sigma_units = np.sqrt(sc.epsilon_0*c_0)/(sc.elementary_charge*1E18*np.sqrt(beta))
+        print("Surface charge: %.5f e/nm^2" % (sigma_hat*sigma_units))
+        print("Excess System charge: %.5f e/nm^2" % sig)
 
     return symm_zz, symm_psi, symm_dens_n, symm_dens_p
 
@@ -247,11 +245,13 @@ def main():
 
     # save computed potential and ion distributions
     saveData(symm_zz, symm_psi, symm_dens_n, symm_dens_p, c_0, kappa, path_out)
+    return verb
 
 
 if __name__ == "__main__":
     start = timeit.default_timer()
-    main()
+    verbose = main()
     stop = timeit.default_timer()
-    print("Time: %.3f s" % (stop - start))
+    if verbose:
+        print("Time: %.3f s" % (stop - start))
 ##########################################################################
