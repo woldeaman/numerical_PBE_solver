@@ -79,11 +79,11 @@ can be specified and will be symmetrized."""), formatter_class=ap.RawTextHelpFor
     # save loaded profiles
     eps, rho, pmf_cat, pmf_an = profiles[0], profiles[1], profiles[2], profiles[3]
     # set valencies for cation and anion seperately
-    assert len(args.valency) <= 2, ('ERROR: List for ion valencies can only have two entries [z_cation, z_anion]!')
-    z_cat, z_an = [args.valency[0]]*2 if len(args.valency) == 1 else args.valency
+    assert len(args.valency) <= 2, ('ERROR: List for ion valencies can only have two entries [val_cation, val_anion]!')
+    val_cat, val_an = [args.valency[0]]*2 if len(args.valency) == 1 else args.valency
 
     return (path_out, verb, N, zz, eps, rho, pmf_cat, pmf_an, args.sigma,
-            args.temp, args.distance, z_cat, z_an, args.c_0)
+            args.temp, args.distance, val_cat, val_an, args.c_0)
 
 
 def convert_units(bins, temp, dist, sig, rho, c_0):
@@ -110,7 +110,7 @@ def convert_units(bins, temp, dist, sig, rho, c_0):
 
 
 @jit(nopython=True)  # iterative loop compiled by numba
-def iteration_loop(psi_start, omega, dz_hat, z_cat, z_an, sigma_hat, rho_hat, eps,
+def iteration_loop(psi_start, omega, dz_hat, val_cat, val_an, sigma_hat, rho_hat, eps,
                    pmf_cat, pmf_an, tol=1E-10):
     # setting start values
     psi = psi_start
@@ -122,7 +122,7 @@ def iteration_loop(psi_start, omega, dz_hat, z_cat, z_an, sigma_hat, rho_hat, ep
 
     while rel_err > tol:  # iterate until convergence
         # start with value at left boundary, using neumann BCs
-        rho_0 = (z_cat*np.exp(-z_cat*psi[0]-pmf_cat[0]) - z_an*np.exp(z_an*psi[0]-pmf_an[0]) +
+        rho_0 = (val_cat*np.exp(-val_cat*psi[0]-pmf_cat[0]) - val_an*np.exp(val_an*psi[0]-pmf_an[0]) +
                  rho_hat[0])
         psi_0 = (psi[1] +  # constant field due to surface charge bc
                  2*dz_hat*sigma_hat * (eps[1] + 3*eps[0])/8 +
@@ -131,7 +131,7 @@ def iteration_loop(psi_start, omega, dz_hat, z_cat, z_an, sigma_hat, rho_hat, ep
 
         # now compute internal values inside domain
         for i in range(1, N-1):
-            rho_i = (z_cat*np.exp(-z_cat*psi[i]-pmf_cat[i]) - z_an*np.exp(z_an*psi[i]-pmf_an[i]) +
+            rho_i = (val_cat*np.exp(-val_cat*psi[i]-pmf_cat[i]) - val_an*np.exp(val_an*psi[i]-pmf_an[i]) +
                      rho_hat[i])  # ion charge distribution + extra charges
             psi_i = (psi[i+1]*(-eps[i+1] + 4*eps[i] + eps[i-1])/(8*eps[i]) +
                      psi[i-1]*(eps[i+1] + 4*eps[i] - eps[i-1])/(8*eps[i]) +
@@ -139,7 +139,7 @@ def iteration_loop(psi_start, omega, dz_hat, z_cat, z_an, sigma_hat, rho_hat, ep
             psi[i] = (1 - omega)*psi_prev[i] + omega*psi_i
 
         # now compute value at right boundary
-        rho_N = (z_cat*np.exp(-z_cat*psi[-1]-pmf_cat[-1]) - z_an*np.exp(z_an*psi[-1]-pmf_an[-1]) +
+        rho_N = (val_cat*np.exp(-val_cat*psi[-1]-pmf_cat[-1]) - val_an*np.exp(val_an*psi[-1]-pmf_an[-1]) +
                  rho_hat[-1])
         psi_N = (psi[-2] +  # no field in bulk bc
                  rho_N * (dz_hat**2)*eps[-1]/2)
@@ -159,14 +159,14 @@ def iteration_loop(psi_start, omega, dz_hat, z_cat, z_an, sigma_hat, rho_hat, ep
     return psi
 
 
-def showData(zz, psi, pmf_an, pmf_cat, c_0, beta, z_cat, z_an, sigma_hat, plot=False):
+def showData(zz, psi, pmf_an, pmf_cat, c_0, beta, val_cat, val_an, sigma_hat, plot=False):
     """
     Plots and prints computed data if in verbose mode.
     """
 
     # compute ion densities from potential and pmfs
-    rho_ion_p = 1E-27*c_0*np.exp(-z_cat*psi-pmf_cat)  # cation density in nm^-3
-    rho_ion_n = 1E-27*c_0*np.exp(z_an*psi-pmf_an)  # anion density in nm^-3
+    rho_ion_p = 1E-27*c_0*np.exp(-val_cat*psi-pmf_cat)  # cation density in nm^-3
+    rho_ion_n = 1E-27*c_0*np.exp(val_an*psi-pmf_an)  # anion density in nm^-3
 
     # convert psi to physical units [mV]
     psi_to_phi = 1E3/(sc.elementary_charge*beta)
@@ -179,7 +179,7 @@ def showData(zz, psi, pmf_an, pmf_cat, c_0, beta, z_cat, z_an, sigma_hat, plot=F
     if plot:
         make_plot(symm_zz, symm_psi, symm_dens_n, symm_dens_p)
         # see if ion charge density balances out surface charge
-        sig = np.trapz(z_cat*rho_ion_p - z_an*rho_ion_n, zz)  # excess surface charge
+        sig = np.trapz(val_cat*rho_ion_p - val_an*rho_ion_n, zz)  # excess surface charge
         sigma_units = np.sqrt(sc.epsilon_0*c_0)/(sc.elementary_charge*1E18*np.sqrt(beta))
         print("Surface charge: %.5f e/nm^2" % (sigma_hat*sigma_units))
         print("Excess System charge: %.5f e/nm^2" % sig)
@@ -227,7 +227,7 @@ def saveData(symm_zz, symm_psi, symm_dens_n, symm_dens_p, c_0, kappa, path_out):
 def main():
     # read from command line
     (path_out, verb, bins, zz, eps, rho, pmf_cat, pmf_an, sigma,
-     temp, distance, z_cat, z_an, c_0_pre) = parse_command_line()
+     temp, distance, val_cat, val_an, c_0_pre) = parse_command_line()
     # convert units
     (zz_hat, kappa, c_0, beta, dz_hat, sigma_hat, rho_hat) = convert_units(
         bins, temp, distance, sigma, rho, c_0_pre)
@@ -239,11 +239,11 @@ def main():
     omega = 2/(1 + np.sqrt(np.pi/bins))  # omega parameter for SOR
 
     # call iteration procedure
-    psi = iteration_loop(psi_start, omega, dz_hat, z_cat, z_an, sigma_hat, rho_hat,
+    psi = iteration_loop(psi_start, omega, dz_hat, val_cat, val_an, sigma_hat, rho_hat,
                          eps, pmf_cat, pmf_an)
     (symm_zz, symm_psi,  # compute physical data and plot if in verbos mode
      symm_dens_n, symm_dens_p) = showData(zz, psi, pmf_an, pmf_cat, c_0, beta,
-                                          z_cat, z_an, sigma_hat, plot=verb)
+                                          val_cat, val_an, sigma_hat, plot=verb)
 
     # save computed potential and ion distributions
     saveData(symm_zz, symm_psi, symm_dens_n, symm_dens_p, c_0, kappa, path_out)
