@@ -17,7 +17,7 @@ def parse_command_line():
         Script numerically solves half space of symmetric PBE between two charged
         plates with a salt ionic solution. One sided variable dielectric profile,
         PMFs for the anions and cations, as well as additional charge distributions
-        can be specified and will be symmetrized."""))
+        can be specified and will be symmetrized."""), formatter_class=ap.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-D', dest='distance', type=float, default=1,
                         help='plate separation [in nm]')
     parser.add_argument('-b', dest='bins', type=float, default=100,
