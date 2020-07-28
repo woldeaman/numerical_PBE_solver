@@ -80,7 +80,9 @@ can be specified and will be symmetrized."""), formatter_class=ap.RawTextHelpFor
     eps, rho, pmf_cat, pmf_an = profiles[0], profiles[1], profiles[2], profiles[3]
     # set valencies for cation and anion seperately
     assert len(args.valency) <= 2, ('ERROR: List for ion valencies can only have two entries [val_cation, val_anion]!')
-    val_cat, val_an = [args.valency[0]]*2 if len(args.valency) == 1 else args.valency
+    valency = [args.valency[0]]*2 if len(args.valency) == 1 else args.valency
+    # computing valency factors for concentration as well
+    val_cat, val_an = [[np.max(valency)/val, val] for val in valency]
 
     return (path_out, verb, N, zz, eps, rho, pmf_cat, pmf_an, args.sigma,
             args.temp, args.distance, val_cat, val_an, args.c_0)
@@ -122,7 +124,7 @@ def iteration_loop(psi_start, omega, dz_hat, val_cat, val_an, sigma_hat, rho_hat
 
     while rel_err > tol:  # iterate until convergence
         # start with value at left boundary, using neumann BCs
-        rho_0 = (val_cat*np.exp(-val_cat*psi[0]-pmf_cat[0]) - val_an*np.exp(val_an*psi[0]-pmf_an[0]) +
+        rho_0 = (val_cat[0]*np.exp(-val_cat[1]*psi[0]-pmf_cat[0]) - val_an[0]*np.exp(val_an[1]*psi[0]-pmf_an[0]) +
                  rho_hat[0])
         psi_0 = (psi[1] +  # constant field due to surface charge bc
                  2*dz_hat*sigma_hat * (eps[1] + 3*eps[0])/8 +
@@ -131,7 +133,7 @@ def iteration_loop(psi_start, omega, dz_hat, val_cat, val_an, sigma_hat, rho_hat
 
         # now compute internal values inside domain
         for i in range(1, N-1):
-            rho_i = (val_cat*np.exp(-val_cat*psi[i]-pmf_cat[i]) - val_an*np.exp(val_an*psi[i]-pmf_an[i]) +
+            rho_i = (val_cat[0]*np.exp(-val_cat[1]*psi[i]-pmf_cat[i]) - val_an[0]*np.exp(val_an[1]*psi[i]-pmf_an[i]) +
                      rho_hat[i])  # ion charge distribution + extra charges
             psi_i = (psi[i+1]*(-eps[i+1] + 4*eps[i] + eps[i-1])/(8*eps[i]) +
                      psi[i-1]*(eps[i+1] + 4*eps[i] - eps[i-1])/(8*eps[i]) +
@@ -139,7 +141,7 @@ def iteration_loop(psi_start, omega, dz_hat, val_cat, val_an, sigma_hat, rho_hat
             psi[i] = (1 - omega)*psi_prev[i] + omega*psi_i
 
         # now compute value at right boundary
-        rho_N = (val_cat*np.exp(-val_cat*psi[-1]-pmf_cat[-1]) - val_an*np.exp(val_an*psi[-1]-pmf_an[-1]) +
+        rho_N = (val_cat[0]*np.exp(-val_cat[1]*psi[-1]-pmf_cat[-1]) - val_an[0]*np.exp(val_an[1]*psi[-1]-pmf_an[-1]) +
                  rho_hat[-1])
         psi_N = (psi[-2] +  # no field in bulk bc
                  rho_N * (dz_hat**2)*eps[-1]/2)
@@ -165,8 +167,8 @@ def showData(zz, psi, pmf_an, pmf_cat, c_0, beta, val_cat, val_an, sigma_hat, pl
     """
 
     # compute ion densities from potential and pmfs
-    rho_ion_p = 1E-27*c_0*np.exp(-val_cat*psi-pmf_cat)  # cation density in nm^-3
-    rho_ion_n = 1E-27*c_0*np.exp(val_an*psi-pmf_an)  # anion density in nm^-3
+    rho_ion_p = 1E-27*c_0*val_cat[0]*np.exp(-val_cat[1]*psi-pmf_cat)  # cation density in nm^-3
+    rho_ion_n = 1E-27*c_0*val_an[0]*np.exp(val_an[1]*psi-pmf_an)  # anion density in nm^-3
 
     # convert psi to physical units [mV]
     psi_to_phi = 1E3/(sc.elementary_charge*beta)
@@ -179,7 +181,7 @@ def showData(zz, psi, pmf_an, pmf_cat, c_0, beta, val_cat, val_an, sigma_hat, pl
     if plot:
         make_plot(symm_zz, symm_psi, symm_dens_n, symm_dens_p)
         # see if ion charge density balances out surface charge
-        sig = np.trapz(val_cat*rho_ion_p - val_an*rho_ion_n, zz)  # excess surface charge
+        sig = np.trapz(rho_ion_p - rho_ion_n, zz)  # excess surface charge
         sigma_units = np.sqrt(sc.epsilon_0*c_0)/(sc.elementary_charge*1E18*np.sqrt(beta))
         print("Surface charge: %.5f e/nm^2" % (sigma_hat*sigma_units))
         print("Excess System charge: %.5f e/nm^2" % sig)
