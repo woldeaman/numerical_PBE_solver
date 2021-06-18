@@ -1,10 +1,8 @@
-# PBE Solver
+# Numerical Solver for the Modified Poisson-Boltzman Equation
 
-A powerful solver for the generalized Poisson–Boltzmann equation in the form:
-```math
-  \frac{d\varphi}{dz}\frac{d\varepsilon^{-1}_\perp}{dz} - \varepsilon^{-1}_\perp(z)\frac{d^2\varphi}{dz^2} = \varepsilon_0^{-1}\varepsilon^{-2}_\perp(z)
-  \left[\rho_{\text{ex}} + e c_0\left(z_+e^{-z_+e\beta\varphi-\beta PMF^{+}} - z_-e^{+z_-e\beta\varphi-\beta PMF^{-}} \right)\right]
-```
+A powerful solver based on succesive over-relaxation for the modified Poisson–Boltzmann equation, which includes a dielectric response profile, unequal ionic valencies, surface interactions via potentials of mean force and the presence of impurities. The modified PBE is solved in the form of:
+
+![PBE](/modified_PBE.jpg)
 
 # Installation
 
